@@ -4,7 +4,16 @@
 
 # Showcase
 
-<iframe width="560" height="315" src="https://www.youtube.com/watch?v=j1dKhIUZ-HA" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<section>
+    <div class="container">
+        <div class="columns">
+            <div class="column">
+                <!-- <youtube :video-id="video1"></youtube> -->
+<iframe width="560" height="315" src="https://www.youtube.com/embed/j1dKhIUZ-HA?si=iACTIfaiWSYLzhyU" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+</section>
 
 # Requirements
 
