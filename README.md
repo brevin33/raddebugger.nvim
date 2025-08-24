@@ -16,7 +16,7 @@
 
 ```lua
 {
-    'github.com/brevin33/raddebugger.nvim',
+    'brevin33/raddebugger.nvim',
     dependencies = {
         'nvim-lua/plenary.nvim',
         --'nvim-telescope/telescope.nvim', -- if you want to use telescope for adding targets
