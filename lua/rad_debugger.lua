@@ -18,6 +18,10 @@ local rad_breakpoint_selected_menu_keymaps = {
 	delete = "d",
 }
 
+local breakpoint_color = "#51202a"
+
+local split_height = 20
+
 local function setup(opts)
 	-- check if raddbg is in path
 	local has_raddbg = vim.fn.executable("raddbg") == 1
@@ -57,6 +61,14 @@ local function setup(opts)
 					rad_breakpoint_selected_menu_keymaps.delete = breakpoint_menu.delete
 				end
 			end
+		end
+
+		if opts.split_height ~= nil then
+			split_height = opts.split_height
+		end
+
+		if opts.breakpoint_color ~= nil then
+			breakpoint_color = opts.breakpoint_color
 		end
 	end
 end
@@ -140,7 +152,7 @@ end
 
 -- Define custom highlight group for breakpoints
 vim.api.nvim_set_hl(0, "RadBreakpointLine", {
-	bg = "#51202a", -- Dark red background
+	bg = breakpoint_color, -- Dark red background
 	-- fg = "#ffffff", -- Optional: set text color
 })
 
@@ -209,7 +221,7 @@ end
 
 local function parse_rad_project_file(file_path)
 	local rad_project = {}
-	rad_project.targets = {} -- initialize as an empty table
+	rad_project.targets = {}  -- initialize as an empty table
 	rad_project.breakpoints = {} -- initialize as an empty table
 	rad_project.recent_file = {} -- initialize as an empty table
 
@@ -520,12 +532,12 @@ local function create_list_buf(name, list, list_val_main_key)
 
 	if target_bufnr then
 		-- Switch to the buffer in a new window
-		vim.cmd("botright split")
+		vim.cmd("botright " .. tostring(split_height) .. "split")
 		vim.api.nvim_win_set_buf(0, target_bufnr)
 		buf = target_bufnr
 		vim.api.nvim_buf_set_option(buf, "modifiable", true)
 	else
-		vim.cmd("botright new")
+		vim.cmd("botright " .. tostring(split_height) .. "new")
 		buf = vim.api.nvim_get_current_buf()
 	end
 
@@ -582,8 +594,8 @@ local function create_list_buf(name, list, list_val_main_key)
 			vim.api.nvim_buf_set_extmark(buf, ns_id_menu, i - 1, 0, {
 				virt_text = {
 					{ "  " .. info.key, "Identifier" },
-					{ ": ", "Normal" },
-					{ info.val, "Normal" },
+					{ ": ",             "Normal" },
+					{ info.val,         "Normal" },
 				},
 				virt_text_pos = "overlay",
 			})
