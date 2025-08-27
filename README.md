@@ -1,6 +1,6 @@
 # Rad Debugger Nvim
 
-[Rad Debugger](https://github.com/EpicGamesExt/raddebugger) integrating for Neovim
+[Rad Debugger](https://github.com/EpicGamesExt/raddebugger) integration for Neovim
 
 # Showcase
 
