@@ -432,6 +432,58 @@ local function save_rad_project()
 	return true
 end
 
+local function update_rad_breakpoints_visual()
+	-- remove all breakpoints
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		vim.api.nvim_buf_clear_namespace(bufnr, ns_id_breakpoints, 0, -1)
+	end
+
+	-- add a symbol and color lines with breakpoints
+	if rad_project == nil then
+		return
+	end
+	if rad_project.breakpoints == nil then
+		return
+	end
+	for _, breakpoint in ipairs(rad_project.breakpoints) do
+		local file_path = breakpoint.path
+		local line = tonumber(breakpoint.line)
+
+		-- check if the file exists
+		local ok = vim.fn.filereadable(file_path) == 1
+		if not ok then
+			print("No file found at path: " .. file_path)
+			goto continue
+		end
+
+		-- Get buffer number for the file
+		local bufnr = vim.fn.bufnr(file_path, true)
+
+		-- Load the buffer if it's not already loaded
+		if not vim.api.nvim_buf_is_loaded(bufnr) then
+			vim.fn.bufload(bufnr)
+		end
+
+		-- check if the line exists in the buffer
+		local line_count = vim.api.nvim_buf_line_count(bufnr)
+		if line > line_count or line < 1 then
+			print("Line " .. line .. " is out of range in file: " .. file_path)
+			goto continue
+		end
+
+		-- vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("breakpoint_symbol"), line - 1, 0, {})
+		-- Place the sign using extmarks (more modern approach)
+		vim.api.nvim_buf_set_extmark(bufnr, ns_id_breakpoints, line - 1, 0, {
+			sign_hl_group = "DiagnosticError",
+			line_hl_group = "RadBreakpointLine",
+			right_gravity = false,
+			invalidate = true,
+		})
+
+		::continue::
+	end
+end
+
 local update_rad_project = function()
 	if rad_project_file_path == nil then
 		print("have not selected a rad project file yet")
@@ -454,55 +506,7 @@ local update_rad_project = function()
 	local last_breakpoints = rad_project.breakpoints
 	rad_project = parse_rad_project_file(rad_project_file_path)
 
-	vim.schedule(function()
-		-- remove all breakpoints
-		if last_breakpoints then
-			for _, breakpoint in ipairs(last_breakpoints) do
-				local file_path = breakpoint.path
-				local bufnr = vim.fn.bufnr(file_path, false)
-				if bufnr ~= -1 then
-					vim.api.nvim_buf_clear_namespace(bufnr, vim.api.nvim_create_namespace("breakpoint_symbol"), 0, -1)
-					vim.api.nvim_buf_clear_namespace(bufnr, ns_id_breakpoints, 0, -1)
-				end
-			end
-		end
-		-- add a symbol and color lines with breakpoints
-		for _, breakpoint in ipairs(rad_project.breakpoints) do
-			local file_path = breakpoint.path
-			local line = tonumber(breakpoint.line)
-
-			-- check if the file exists
-			local ok = vim.fn.filereadable(file_path) == 1
-			if not ok then
-				print("No file found at path: " .. file_path)
-				goto continue
-			end
-
-			-- Get buffer number for the file
-			local bufnr = vim.fn.bufnr(file_path, true)
-
-			-- Load the buffer if it's not already loaded
-			if not vim.api.nvim_buf_is_loaded(bufnr) then
-				vim.fn.bufload(bufnr)
-			end
-
-			-- check if the line exists in the buffer
-			local line_count = vim.api.nvim_buf_line_count(bufnr)
-			if line > line_count or line < 1 then
-				print("Line " .. line .. " is out of range in file: " .. file_path)
-				goto continue
-			end
-
-			vim.api.nvim_buf_set_extmark(bufnr, vim.api.nvim_create_namespace("breakpoint_symbol"), line - 1, 0, {})
-			-- Place the sign using extmarks (more modern approach)
-			vim.api.nvim_buf_set_extmark(bufnr, ns_id_breakpoints, line - 1, 0, {
-				sign_hl_group = "DiagnosticError",
-				line_hl_group = "RadBreakpointLine",
-			})
-
-			::continue::
-		end
-	end)
+	vim.schedule(update_rad_breakpoints_visual)
 
 	return true
 end
@@ -630,12 +634,6 @@ local function create_list_buf(name, list, list_val_main_key)
 	vim.api.nvim_buf_set_keymap(buf, "n", "j", "", { noremap = true, silent = true, callback = move_to_next_target })
 	vim.api.nvim_buf_set_keymap(buf, "n", "k", "", { noremap = true, silent = true, callback = move_to_prev_target })
 
-	vim.api.nvim_buf_set_keymap(buf, "n", "<CR>", "", {
-		noremap = true,
-		silent = true,
-		callback = callback,
-	})
-
 	-- bind escape key to exit the buffer
 	vim.api.nvim_buf_set_keymap(buf, "n", "<ESC>", "", {
 		noremap = true,
@@ -644,42 +642,6 @@ local function create_list_buf(name, list, list_val_main_key)
 			vim.api.nvim_buf_delete(buf, { force = true })
 		end,
 	})
-end
-
-local function rad_select_target(target_path)
-	local file_name = get_file_name_and_extenstion_from_path(target_path)
-	if file_name == nil then
-		vim.fn.system("raddbg --ipc select_target " .. target_path)
-	else
-		vim.fn.system("raddbg --ipc select_target " .. file_name)
-	end
-end
-
-local function rad_enable_target(target_path)
-	local file_name = get_file_name_and_extenstion_from_path(target_path)
-	if file_name == nil then
-		vim.fn.system("raddbg --ipc enable_target " .. target_path)
-	else
-		vim.fn.system("raddbg --ipc enable_target " .. file_name)
-	end
-end
-
-local function rad_disable_target(target_path)
-	local file_name = get_file_name_and_extenstion_from_path(target_path)
-	if file_name == nil then
-		vim.fn.system("raddbg --ipc disable_target " .. target_path)
-	else
-		vim.fn.system("raddbg --ipc disable_target " .. file_name)
-	end
-end
-
-local function rad_delete_target(target_path)
-	local file_name = get_file_name_and_extenstion_from_path(target_path)
-	if file_name == nil then
-		vim.fn.system("raddbg --ipc remove_target " .. target_path)
-	else
-		vim.fn.system("raddbg --ipc remove_target " .. file_name)
-	end
 end
 
 local function select_rad_target()
@@ -701,17 +663,15 @@ local function select_rad_target()
 	local function select()
 		local line = vim.fn.line(".")
 		local line_idx = line_to_target_index(line)
-		local target = rad_project.targets[line_idx]
 		-- close the list buffer
 		vim.api.nvim_buf_delete(buf, { force = true })
-		rad_select_target(target.executable)
+		vim.fn.system("raddbg --ipc select_target targets[" .. (line_idx - 1) .. "]")
 	end
 
 	local function enabled()
 		local line = vim.fn.line(".")
 		local line_idx = line_to_target_index(line)
-		local target = rad_project.targets[line_idx]
-		rad_enable_target(target.executable)
+		vim.fn.system("raddbg --ipc enable_target targets[" .. (line_idx - 1) .. "]")
 		-- reopen to refresh the list
 		vim.api.nvim_buf_delete(buf, { force = true })
 		success = select_rad_target()
@@ -726,8 +686,8 @@ local function select_rad_target()
 	local function disabled()
 		local line = vim.fn.line(".")
 		local line_idx = line_to_target_index(line)
-		local target = rad_project.targets[line_idx]
-		rad_disable_target(target.executable)
+		vim.fn.system("raddbg --ipc disable_target targets[" .. (line_idx - 1) .. "]")
+		--rad_disable_target(target.executable)
 		-- reopen to refresh the list
 		vim.api.nvim_buf_delete(buf, { force = true })
 		success = select_rad_target()
@@ -744,9 +704,9 @@ local function select_rad_target()
 		local line_idx = line_to_target_index(line)
 		local target = rad_project.targets[line_idx]
 		if target.enabled then
-			rad_disable_target(target.executable)
+			vim.fn.system("raddbg --ipc disable_target targets[" .. (line_idx - 1) .. "]")
 		else
-			rad_enable_target(target.executable)
+			vim.fn.system("raddbg --ipc enable_target targets[" .. (line_idx - 1) .. "]")
 		end
 		-- reopen to refresh the list
 		vim.api.nvim_buf_delete(buf, { force = true })
@@ -762,8 +722,8 @@ local function select_rad_target()
 	local function delete()
 		local line = vim.fn.line(".")
 		local line_idx = line_to_target_index(line)
-		local target = rad_project.targets[line_idx]
-		rad_delete_target(target.executable)
+		--rad_delete_target(target.executable)
+		vim.fn.system("raddbg --ipc remove_target targets[" .. (line_idx - 1) .. "]")
 		-- reopen to refresh the list
 		vim.api.nvim_buf_delete(buf, { force = true })
 		success = select_rad_target()
@@ -851,8 +811,7 @@ local function goto_rad_breakpoint()
 		local file_location = format_file_location_for_rad(breakpoint.path, breakpoint.line)
 		-- format a bit differently becuase we need to target the exact thing from the project file
 		--local file_location = tostring(breakpoint.path) .. ":" .. tostring(breakpoint.line)
-
-		vim.fn.system("raddbg --ipc toggle_breakpoint " .. file_location)
+		vim.fn.system("raddbg --ipc remove_breakpoint breakpoints[" .. (line_idx - 1) .. "]")
 		-- reopen to refresh the list
 		vim.api.nvim_buf_delete(buf, { force = true })
 		success = goto_rad_breakpoint()
@@ -888,33 +847,56 @@ local function rad_toggle_breakpoint()
 	--vim.fn.system("raddbg --ipc toggle_breakpoint " .. file_location)
 	local scrolloff = vim.opt.scrolloff:get()
 
-	-- remove all breakpoints
-	local exists = false
 	local current_buffer = vim.api.nvim_get_current_buf()
 	local current_file_path = vim.api.nvim_buf_get_name(current_buffer)
 	local current_line = vim.fn.line(".")
 
+	update_rad_project()
+	-- check if the file exists
+	local exisited = false
+	local breakpoints = rad_project.breakpoints
+	for idx, breakpoint in ipairs(breakpoints) do
+		local breakpoint_file_location = format_file_location_for_rad(breakpoint.path, breakpoint.line)
+		breakpoint_file_location = switch_slashes(breakpoint_file_location)
+		if breakpoint_file_location == file_location then
+			vim.fn.system("raddbg --ipc remove_breakpoint breakpoints[" .. (idx - 1) .. "]")
+			exisited = true
+		end
+	end
+	if not exisited then
+		vim.fn.system("raddbg --ipc toggle_breakpoint " .. file_location)
+	end
+	update_rad_project()
+
 	-- async because this can have to wait on the rad debugger
-	local Job = require("plenary.job")
-	Job:new({
-		command = "raddbg",
-		args = { "--ipc", "toggle_breakpoint", file_location },
-		on_exit = function(j, return_val)
-			update_rad_project()
-			vim.schedule(function()
-				-- don't no why neovim is doing this
-				vim.opt.scrolloff = scrolloff
-			end)
-		end,
-	}):start()
+	-- local Job = require("plenary.job")
+	-- Job:new({
+	-- 	command = "raddbg",
+	-- 	args = { "--ipc", "toggle_breakpoint", file_location },
+	-- 	on_exit = function(j, return_val)
+	-- 		update_rad_project()
+	-- 		vim.schedule(function()
+	-- 			-- don't no why neovim is doing this
+	-- 			vim.opt.scrolloff = scrolloff
+	-- 		end)
+	-- 	end,
+	-- }):start()
 end
 
-local function rad_step_over()
+local function rad_step_over_line()
 	vim.fn.system("raddbg --ipc step_over_line")
 end
 
-local function rad_step_into()
+local function rad_step_into_line()
 	vim.fn.system("raddbg --ipc step_into_line")
+end
+
+local function rad_step_over()
+	vim.fn.system("raddbg --ipc step_over")
+end
+
+local function rad_step_into()
+	vim.fn.system("raddbg --ipc step_into")
 end
 
 local function rad_step_out()
@@ -954,6 +936,19 @@ local function select_rad_project_file(path)
 	if rel_path_to_project_file == "." or rel_path_to_project_file == "./" then
 		rel_path_to_project_file = ""
 	end
+
+	-- setup autocommands to update breakpoints on text change
+	vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+		pattern = "*",
+		callback = function()
+			local buf = vim.api.nvim_get_current_buf()
+			local current_line_count = vim.api.nvim_buf_line_count(buf)
+			if current_line_count ~= last_line_count then
+				update_rad_breakpoints_visual()
+			end
+			last_line_count = current_line_count
+		end,
+	})
 end
 
 local function rad_remove_all_breakpoints()
@@ -987,4 +982,6 @@ M.toggle_breakpoint = rad_toggle_breakpoint
 M.run = rad_run
 M.is_rad_init = is_rad_init
 M.open = rad_open
+M.step_over_line = rad_step_over_line
+M.step_into_line = rad_step_into_line
 return M
